@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>Certificates - Kingdom Seekers Fellowship</title>
+  
+  <!-- jsPDF for certificate generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'Segoe UI', Arial, sans-serif; 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 20px; overflow: hidden; }
+    
+    .header { 
+      background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); 
+      color: white; 
+      padding: 30px 20px; 
+      text-align: center; 
+    }
+    .header h1 { font-size: 28px; margin-bottom: 8px; }
+    .header p { opacity: 0.9; font-size: 14px; }
+    
+    .content { padding: 20px; }
+    
+    .stats { 
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
+      color: white; 
+      padding: 20px; 
+      border-radius: 12px; 
+      text-align: center; 
+      margin-bottom: 25px;
+    }
+    .stats h2 { font-size: 42px; margin-bottom: 5px; }
+    .stats p { font-size: 14px; opacity: 0.95; }
+    
+    .filters { 
+      background: #f8fafc; 
+      padding: 15px; 
+      border-radius: 12px; 
+      margin-bottom: 20px;
+    }
+    .search-box { 
+      width: 100%; 
+      padding: 12px 15px; 
+      border: 2px solid #e2e8f0; 
+      border-radius: 10px; 
+      font-size: 14px;
+    }
+    .search-box:focus { outline: none; border-color: #667eea; }
+    
+    .student-list { margin-top: 10px; }
+    
+    .student-card { 
+      border: 2px solid #e2e8f0; 
+      border-radius: 12px; 
+      padding: 20px; 
+      margin: 12px 0; 
+      background: white;
+      transition: all 0.2s ease;
+    }
+    .student-card:hover { border-color: #667eea; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15); }
+    
+    .student-card h3 { 
+      color: #2d3748; 
+      margin-bottom: 12px; 
+      font-size: 18px;
+    }
+    .student-card p { 
+      color: #64748b; 
+      margin: 6px 0; 
+      font-size: 13px;
+    }
+    
+    .badge { 
+      display: inline-block; 
+      background: #e0e7ff; 
+      color: #667eea; 
+      padding: 4px 12px; 
+      border-radius: 12px; 
+      font-size: 11px; 
+      font-weight: 600;
+    }
+    .grad-badge { 
+      background: #d1fae5; 
+      color: #065f46; 
+      margin-left: 8px;
+    }
+    
+    .btn { 
+      background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); 
+      color: white; 
+      border: none; 
+      padding: 12px 20px; 
+      border-radius: 10px; 
+      font-weight: 600; 
+      cursor: pointer; 
+      width: 100%; 
+      margin-top: 12px;
+      font-size: 14px;
+      transition: transform 0.2s ease;
+    }
+    .btn:hover { transform: translateY(-2px); }
+    
+    .loading { text-align: center; padding: 50px 20px; color: #64748b; font-size: 16px; }
+    .error { background: #fee2e2; color: #dc2626; padding: 20px; border-radius: 12px; margin: 20px 0; font-size: 14px; }
+    .success { background: #d1fae5; color: #059669; padding: 15px; border-radius: 8px; margin: 10px 0; font-size: 14px; }
+    
+    .back-link { 
+      display: block; 
+      text-align: center; 
+      background: #667eea; 
+      color: white; 
+      padding: 15px; 
+      border-radius: 0 0 20px 20px; 
+      text-decoration: none; 
+      font-weight: 600;
+    }
+    .back-link:hover { background: #556cd6; }
+    
+    @media (max-width: 768px) {
+      .header h1 { font-size: 24px; }
+      .stats h2 { font-size: 36px; }
+      .container { border-radius: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎓 Certificate Generator</h1>
+      <p>Kingdom Seekers Fellowship</p>
+    </div>
+    
+    <div class="content">
+      <div class="stats">
+        <h2 id="totalCount">0</h2>
+        <p>Students Graduated</p>
+      </div>
+
+      <div class="filters">
+        <input type="text" class="search-box" id="searchInput" placeholder="🔍 Search by name or class..." oninput="filterStudents()">
+      </div>
+
+      <div id="status"></div>
+      <div id="studentList" class="student-list"></div>
+    </div>
+    
+    <a href="https://njorastephen1-creator.github.io/forevergreatful/" class="back-link">← Back to Main Tracker</a>
+  </div>
+    <script>
+    console.log('=== STANDALONE CERTIFICATE GENERATOR ===');
+    
+    // ============ NEW Firebase Project (PRIMARY - for this app) ============
+    // This is YOUR new project: certificate-81c93
+    const newFirebaseConfig = {
+      apiKey: "AIzaSyAz8Yv5TCai62cPGVYEZm33U8cD2kW_9hU",
+      authDomain: "certificate-81c93.firebaseapp.com",
+      projectId: "certificate-81c93",
+      storageBucket: "certificate-81c93.firebasestorage.app",
+      messagingSenderId: "515333540179",
+      appId: "1:515333540179:web:10a5e71699d54bb828b9a6"
+    };
+
+    // ============ ORIGINAL Firebase Project (READ-ONLY - for student data) ============
+    // This connects to your discipleship tracker database
+    const originalFirebaseConfig = {
+      apiKey: "AIzaSyCdSvUk6qpC857ZJfaDbniDlOKvWXPYYXY",
+      authDomain: "discipleship-dashboard-4d713.firebaseapp.com",
+      databaseURL: "https://discipleship-dashboard-4d713-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "discipleship-dashboard-4d713",
+      storageBucket: "discipleship-dashboard-4d713.firebasestorage.app",
+      messagingSenderId: "27738663604",
+      appId: "1:27738663604:web:bf1898247e0dd5a37805e1"
+    };
+
+    let graduates = [];
+    let filteredGraduates = [];
+
+    // Initialize BOTH Firebase apps
+    try {
+      // 1. Initialize NEW app (primary for this standalone page)
+      const newApp = firebase.initializeApp(newFirebaseConfig, 'certificate-app');
+      console.log('✅ NEW Firebase initialized:', newApp.name);
+      
+      // 2. Initialize ORIGINAL app (read-only for student data)
+      const originalApp = firebase.initializeApp(originalFirebaseConfig, 'discipleship-app');
+      const originalDb = originalApp.database();
+      console.log('✅ ORIGINAL Firebase initialized (READ-ONLY):', originalApp.name);
+      
+      // Load graduates from ORIGINAL database
+      loadGraduates(originalDb);
+      
+    } catch (error) {
+      console.error('❌ Firebase initialization error:', error);
+      document.getElementById('status').innerHTML = 
+        '<div class="error">Error: ' + error.message + '</div>';
+    }
+
+    function loadGraduates(db) {
+      console.log('📥 Loading graduates from original database...');
+      document.getElementById('status').innerHTML = '<div class="loading">Loading graduates...</div>';
+      
+      db.ref('students').once('value')
+        .then(snapshot => {
+          console.log('✅ Students loaded');
+          const studentsData = snapshot.val() || {};
+          
+          graduates = [];
+          
+          // Find all graduated students
+          Object.keys(studentsData).forEach(id => {
+            const student = studentsData[id];
+            
+            // Check if graduated by status OR graduation date
+            if (student.graduationDate || student.status === 'graduated') {
+              graduates.push({
+                id: id,
+                name: student.name || 'Unknown',
+                class: student.class || 'N/A',
+                phone: student.phone || 'N/A',
+                cohort: student.cohort || 'N/A',
+                graduationDate: student.graduationDate || new Date().toISOString().split('T')[0],
+                email: student.email || ''
+              });
+            }
+          });
+          
+          console.log('🎓 Graduates found:', graduates.length);
+          
+          // Sort by graduation date (newest first)
+          graduates.sort((a, b) => new Date(b.graduationDate) - new Date(a.graduationDate));
+          
+          filteredGraduates = [...graduates];
+          displayGraduates();
+          
+        })
+        .catch(error => {
+          console.error('❌ Error loading students:', error);
+          document.getElementById('status').innerHTML = 
+            '<div class="error">Error loading students: ' + error.message + '<br><br>' +
+            'Check Firebase Database Rules allow read access.</div>';
+        });
+    }
+
+    function displayGraduates() {
+      document.getElementById('totalCount').textContent = filteredGraduates.length;
+      
+      if (filteredGraduates.length === 0) {
+        const msg = graduates.length === 0 ? 
+          'No graduated students yet' : 
+          'No students match your search';
+          
+        document.getElementById('studentList').innerHTML = 
+          '<div class="loading">' + msg + '</div>';
+        return;
+      }
+      
+      document.getElementById('status').innerHTML = 
+        '<div class="success">Showing ' + filteredGraduates.length + ' graduate(s)</div>';
+      
+      const html = filteredGraduates.map(student => {
+        const date = new Date(student.graduationDate).toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'long', 
+          year: 'numeric'
+        });
+        
+        return '<div class="student-card">' +
+          '<h3>' + student.name + '</h3>' +
+          '<p><span class="badge">Class ' + student.class + '</span><span class="badge grad-badge">✓ Graduated</span></p>' +
+          '<p>📞 ' + student.phone + '</p>' +
+          '<p>📅 Graduated: ' + date + '</p>' +
+          '<p>📚 Cohort: ' + student.cohort + '</p>' +
+          '<button class="btn" onclick="generateCertificate(\'' + student.id + '\', \'' + 
+          student.name.replace(/'/g, "\\'") + '\', \'' + student.graduationDate + '\')">🎓 Generate Certificate</button>' +
+          '</div>';
+      }).join('');
+      
+      document.getElementById('studentList').innerHTML = html;
+    }
+
+    function filterStudents() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      
+      filteredGraduates = graduates.filter(student => {
+        return !search || 
+          student.name.toLowerCase().includes(search) ||
+          student.class.toLowerCase().includes(search) ||
+          student.phone.includes(search);
+      });
+      
+      displayGraduates();
+    }
+              function generateCertificate(studentId, studentName, gradDate) {
+      console.log('Generating certificate for:', studentName);
+      
+      try {
+        const { jsPDF } = window.jspdf;
+        
+        // ========== PORTRAIT MODE: 21cm × 29.7cm ==========
+        const doc = new jsPDF({
+          orientation: 'portrait',
+          unit: 'cm',
+          format: [21, 29.7]
+        });
+        
+        const pageWidth = 21;
+        const pageHeight = 29.7;
+        
+        // Colors (exact match)
+        const darkBlue = '#1e3a8a';
+        const lightBlue = '#3b82f6';
+        const orange = '#f59e0b';
+        
+        // ========== WHITE BACKGROUND ==========
+        doc.setFillColor(255, 255, 255);
+        doc.rect(0, 0, pageWidth, pageHeight, 'F');
+        
+        // ========== DECORATIVE CORNERS ==========
+        // Top right - Blue triangle
+        doc.setFillColor(59, 130, 246);
+        doc.triangle(pageWidth - 5, 0, pageWidth, 0, pageWidth, 6, 'F');
+        
+        // Top right - Orange triangle (inner)
+        doc.setFillColor(245, 158, 11);
+        doc.triangle(pageWidth - 4, 0, pageWidth, 0, pageWidth, 5, 'F');
+        
+        // Bottom left - Blue triangle
+        doc.setFillColor(59, 130, 246);
+        doc.triangle(0, pageHeight, 5, pageHeight, 0, pageHeight - 6, 'F');
+        
+        // Bottom left - Orange triangle (inner)
+        doc.setFillColor(245, 158, 11);
+        doc.triangle(0, pageHeight, 4, pageHeight, 0, pageHeight - 5, 'F');
+        
+        // ========== ORANGE BORDER FRAME ==========
+        doc.setDrawColor(245, 158, 11);
+        doc.setLineWidth(0.3);
+        doc.rect(1.2, 1.2, pageWidth - 2.4, pageHeight - 2.4);
+        
+        // ========== LOGO AT TOP CENTER ==========
+        const logoUrl = 'https://njorastephen1-creator.github.io/important-2/download.jfif';
+        
+        try {
+          doc.addImage(logoUrl, 'JPEG', pageWidth/2 - 1.75, 1.5, 3.5, 3.5);
+        } catch (e) {
+          console.log('Logo fallback');
+          doc.setFillColor(239, 68, 68);
+          doc.circle(pageWidth/2, 3.25, 1.5, 'F');
+        }
+        
+        // ========== ORGANIZATION NAME ==========
+        doc.setFontSize(22);
+        doc.setTextColor(30, 58, 138);
+        doc.setFont('helvetica', 'bold');
+        doc.text('KINGDOM SEEKERS FELLOWSHIP', pageWidth / 2, 6, { align: 'center' });
+        
+        // ========== ADDRESS ==========
+        doc.setFontSize(10);
+        doc.setTextColor(30, 58, 138);
+        doc.setFont('helvetica', 'normal');
+        doc.text('1139-00600', pageWidth / 2, 6.7, { align: 'center' });
+        doc.text('NGARA NAIROBI', pageWidth / 2, 7.3, { align: 'center' });
+        
+        // ========== CERTIFICATE TITLE ==========
+        doc.setFontSize(30);
+        doc.setTextColor(59, 130, 246);
+        doc.setFont('times', 'bolditalic');
+        doc.text('Discipleship Certificate', pageWidth / 2, 9.3, { align: 'center' });
+        
+        // ========== AWARDED TO ==========
+        doc.setFontSize(13);
+        doc.setTextColor(62, 39, 35);
+        doc.setFont('times', 'italic');
+        doc.text('Awarded To', pageWidth / 2, 10.7, { align: 'center' });
+        
+        // ========== STUDENT NAME ==========
+        doc.setFontSize(20);
+        doc.setTextColor(30, 58, 138);
+        doc.setFont('times', 'bold');
+        doc.text(studentName.toUpperCase(), pageWidth / 2, 12, { align: 'center' });
+        
+        // ========== DOTTED LINE ==========
+        doc.setDrawColor(30, 58, 138);
+        doc.setLineWidth(0.1);
+        doc.setLineDashPattern([0.3, 0.3]);
+        doc.line(2.5, 12.4, pageWidth - 2.5, 12.4);
+        doc.setLineDashPattern([]);
+        
+        // ========== COURSE DESCRIPTION ==========
+        doc.setFontSize(9);
+        doc.setTextColor(31, 41, 55);
+        doc.setFont('times', 'normal');
+        doc.text('Upon successful completion of the Discipleship Course which entails:-', pageWidth / 2, 13.4, { align: 'center' });
+        
+        // ========== LESSONS LIST (2 columns - BOLD) ==========
+        const lessons = [
+          "1. SALVATION",
+          "2. TEMPTATIONS",
+          "3. PRAYERS",
+          "4. THE BIBLE",
+          "5. FELLOWSHIP",
+          "6. BEARING FRUITS/WITNESSING",
+          "7. BAPTISM",
+          "8. HOLY SPIRIT",
+          "9. KINGDOM SERVICE",
+          "10. DELIVERANCE"
+        ];
+        
+        doc.setFontSize(9);
+        doc.setTextColor(62, 39, 35);
+        doc.setFont('helvetica', 'bold');
+        
+        // Left column (1-5)
+        const leftColumnX = 4.5;
+        const rightColumnX = 12;
+        const startY = 14.5;
+        const lineHeight = 1.1;
+        
+        for (let i = 0; i < 5; i++) {
+          doc.text(lessons[i], leftColumnX, startY + (i * lineHeight));
+        }
+        
+        // Right column (6-10)
+        for (let i = 5; i < 10; i++) {
+          doc.text(lessons[i], rightColumnX, startY + ((i - 5) * lineHeight));
+        }
+        
+        // ========== DATE ==========
+        const dateObj = new Date(gradDate);
+        const day = dateObj.getDate();
+        const month = dateObj.toLocaleString('en-GB', { month: 'long' });
+        const year = dateObj.getFullYear();
+        
+        const getOrdinal = (n) => {
+          const s = ["th", "st", "nd", "rd"];
+          const v = n % 100;
+          return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        };
+        
+        doc.setFontSize(9);
+        doc.setTextColor(31, 41, 55);
+        doc.setFont('times', 'italic');
+        doc.text('on this ' + getOrdinal(day) + ' Day of ' + month + ', ' + year + '.', pageWidth / 2, 19.5, { align: 'center' });
+        
+        // ========== SIGNATURE WITH IMAGE (NO UNDERLINE) ==========
+        // Pastor's signature image - NO UNDERLINE since image has it
+        const signatureUrl = 'https://njorastephen1-creator.github.io/important-2/sign.jpg';
+        
+        try {
+          // Add signature image (4cm wide, positioned where signature should be)
+          // NO dotted line below since signature image already has underline
+          doc.addImage(signatureUrl, 'JPEG', 13, 20.5, 5, 2);
+        } catch (e) {
+          console.log('Signature fallback - using text');
+          // Fallback if signature doesn't load
+          doc.setFontSize(14);
+          doc.setTextColor(30, 58, 138);
+          doc.setFont('times', 'italic');
+          doc.text('Essollom Karanja', 15.5, 21, { align: 'center' });
+        }
+        
+        // ========== NAME & TITLE (Below Signature) ==========
+        doc.setFontSize(8.5);
+        doc.setTextColor(31, 41, 55);
+        doc.setFont('helvetica', 'bold');
+        doc.text('ESSOLLOM KARANJA.', 15.5, 23, { align: 'center' });
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.text('Senior Pastor', 15.5, 23.4, { align: 'center' });
+        
+        // ========== MOTTO ==========
+        doc.setFontSize(11);
+        doc.setTextColor(62, 39, 35);
+        doc.setFont('times', 'italic');
+        doc.text('Seek Ye First The Kingdom Of God', pageWidth / 2, 24.5, { align: 'center' });
+        
+        // ========== SAVE PDF ==========
+        const fileName = 'Certificate_' + studentName.replace(/\s+/g, '_') + '_' + gradDate + '.pdf';
+        doc.save(fileName);
+        
+        // Log to NEW Firebase
+        try {
+          const newDb = firebase.app('certificate-app').database();
+          newDb.ref('generated_certificates/' + studentId).push({
+            studentName: studentName,
+            generatedAt: new Date().toISOString(),
+            graduationDate: gradDate,
+            fileName: fileName
+          });
+        } catch (logError) {
+          console.log('Log error:', logError.message);
+        }
+        
+        alert('✅ Certificate generated for ' + studentName + '!');
+        
+      } catch (error) {
+        console.error('Error generating PDF:', error);
+        alert('Error: ' + error.message);
+      }
+    }
+
+    // Helper function
+    function getOrdinal(n) {
+      const s = ["th", "st", "nd", "rd"];
+      const v = n % 100;
+      return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    }
+
+    // Initialize
+    window.addEventListener('DOMContentLoaded', () => {
+      console.log('✅ Certificate Generator - Signature WITHOUT Underline');
+    });
+  </script>
+</body>
+</html>
